@@ -108,11 +108,11 @@ Running the main notebook will produce:
 
 - **Matplotlib output**: static plots showing instance masks overlaid on images (e.g., bounding regions, colored masks).
   
-  ![example_output.png](example_output.png)
+  ![example_output.png](image/example_output.png)
 
 
   **Rerun output**: a dynamic visualization window (or web viewer) with interactive camera controls, timelines, and overlays for instances rendered as 2D/3D primitives.
-  ![example_output_rerun.png](example_output_rerun.png)
+  ![example_output_rerun.png](image/example_output_rerun.png)
 
 
 Marimo keeps code and outputs in sync reactively, so editing a cell that affects data or visualization will automatically recompute dependent cells and refresh the outputs.
