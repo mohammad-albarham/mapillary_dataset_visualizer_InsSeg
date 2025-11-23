@@ -2,7 +2,7 @@
 
 This project provides interactive, dynamic instance-visualization for the Mapillary Vistas Dataset using [marimo](https://marimo.io/) and [Rerun](https://rerun.io/). It combines static plots (via Matplotlib) with rich, real-time 2D/3D views in Rerun to support inspection and exploration of instance-level annotations. marimo is used as the primary, reactive notebook environment and app framework for running and interacting with the visualizations.
 
-![post_content/project_repo.jpg](post_content/project_repo.jpg)
+![images/project_repo.jpg](images/project_repo.jpg)
 
 
 ***
@@ -108,11 +108,11 @@ Running the main notebook will produce:
 
 - **Matplotlib output**: static plots showing instance masks overlaid on images (e.g., bounding regions, colored masks).
   
-  ![example_output.png](image/example_output.png)
+  ![images/example_output_rerun.png](images/example_output_rerun.png)
 
 
   **Rerun output**: a dynamic visualization window (or web viewer) with interactive camera controls, timelines, and overlays for instances rendered as 2D/3D primitives.
-  ![example_output_rerun.png](image/example_output_rerun.png)
+  ![images/example_output_rerun.png](images/example_output_rerun.png)
 
 
 Marimo keeps code and outputs in sync reactively, so editing a cell that affects data or visualization will automatically recompute dependent cells and refresh the outputs.
