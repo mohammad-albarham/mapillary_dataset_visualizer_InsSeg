@@ -5,7 +5,6 @@ from ensurepip import version
 from pathlib import Path
 from uuid import uuid4
 import rerun as rr
-
 #%%
 
 image_file_path = Path(__file__).parent / "test_img.jpg"
@@ -65,7 +64,7 @@ class MapillaryInstanceDataset(Dataset):
         self.thing_classes = [label for label in self.labels if label["instances"]]
         self.label_id_to_class_id = {}
         
-        # add mapping to colors for visualization later and to be unique for instances 
+        # Add mapping to colors for visualization later and to be unique for instances 
 
         self.label_id_to_color = {}
 
@@ -104,8 +103,8 @@ class MapillaryInstanceDataset(Dataset):
         
         # Split instance_array into labels and instance IDs
         # instance_array encoding: label_id = value / 256, instance_id = value % 256
-        instance_label_array = np.array(instance_array / 256, dtype=np.uint8)
-        instance_ids_array = np.array(instance_array % 256, dtype=np.uint8)
+        # instance_label_array = np.array(instance_array / 256, dtype=np.uint8)
+        # instance_ids_array = np.array(instance_array % 256, dtype=np.uint8)
         
         # Get unique instances (combination of label and instance ID)
         unique_instances = np.unique(instance_array)
@@ -113,7 +112,7 @@ class MapillaryInstanceDataset(Dataset):
         # Filter out background (0) and process each instance
         masks_list = []
         labels_list = []
-        boxes_list = []
+        # boxes_list = []
         colors_list = []
         
         # In __getitem__, add validation:
@@ -122,9 +121,12 @@ class MapillaryInstanceDataset(Dataset):
             if inst_value == 0:
                 continue
             
-            label_id = inst_value // 256
-            instance_id = inst_value % 256
+            # label_id = inst_value // 256
+            # instance_id = inst_value % 256
             
+            label_id = inst_value // 256
+            # instance_id = np.array(inst_value % 256, dtype=np.uint8)
+
             # Validate label_id is within bounds
             if label_id >= len(self.labels):
                 print(f"Warning: label_id {label_id} out of bounds (total labels: {len(self.labels)})")
@@ -137,19 +139,15 @@ class MapillaryInstanceDataset(Dataset):
             # Create binary mask for this instance
             mask = (instance_array == inst_value).astype(np.uint8)
             
-            # Skip if mask is too small (might be noise)
-            if mask.sum() < 20:
-                continue
-            
             masks_list.append(mask)
             
-            # Get class ID using the mapping (should now match __init__ logic)
+            # Get class ID using the mapping
             class_id = self.label_id_to_class_id.get(label_id)
             labels_list.append(class_id)
 
             # Get the color for visualization later
-            color = self.label_id_to_color.get(label_id, [0, 0, 0])
-            colors_list.append(color)
+            color_itm = self.label_id_to_color.get(label_id, [0, 0, 0])
+            colors_list.append(color_itm)
 
         
         # Handle case with no instances
@@ -275,11 +273,6 @@ def create_dataloaders(root_dir, version='v2.0', batch_size=2,
     print(f"Validation: {val_size}")
     print(f"Testing (from validation folder): {test_size}")
 
-    val_dataset, test_dataset = torch.utils.data.random_split(
-        val_full,
-        [val_size, test_size],
-        generator=torch.Generator().manual_seed(42)
-    )
 
     def collate_fn(batch):
         return tuple(zip(*batch))
@@ -298,25 +291,16 @@ def create_dataloaders(root_dir, version='v2.0', batch_size=2,
         pin_memory=True
     )
     val_loader = torch.utils.data.DataLoader(
-        val_dataset,
+        val_full,
         batch_size=1,
         shuffle=False,
         num_workers=num_workers,
         collate_fn=collate_fn,
         pin_memory=True
     )
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset,
-        batch_size=1,
-        shuffle=False,
-        num_workers=num_workers,
-        collate_fn=collate_fn,
-        pin_memory=True
-    )
-
     num_classes = train_full.get_num_classes()
 
-    return train_loader, val_loader, test_loader, num_classes
+    return train_loader, val_loader, num_classes
 
 #%%
 """
@@ -328,7 +312,7 @@ DATASET_ROOT = Path(__file__).parent / 'mapillary_dataset'  # Change this to you
 VERSION = 'v2.0'
 
 # Create dataloaders
-train_loader, val_loader, test_loader, num_classes = create_dataloaders(
+train_loader, val_loader, num_classes = create_dataloaders(
     root_dir=DATASET_ROOT,
     version=VERSION,
     batch_size=5,
@@ -341,7 +325,6 @@ train_loader, val_loader, test_loader, num_classes = create_dataloaders(
 print(f"\nNumber of classes (including background): {num_classes}")
 print(f"Train batches: {len(train_loader)}")
 print(f"Validation batches: {len(val_loader)}")
-print(f"Test batches: {len(test_loader)}")
 
 #%%
 """
@@ -379,76 +362,27 @@ def get_class_names(root_dir, version='v2.0'):
     
     labels = config['labels']
     class_names = ['__background__']
-    
-    for label in labels:
-        if label["instances"]:
-            class_names.append(label["readable"])
-    
-    return class_names
-
-def get_class_colors(root_dir, version='v2.0'):
-    """
-    Get list of class colors (thing classes only)
-    Returns list where index 0 is background, index 1+ are thing classes
-    """
-    config_path = os.path.join(root_dir, f'config_{version}.json')
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    
-    labels = config['labels']
     class_colors = [[0, 0, 0]]  # Background color (black)
     
     for label in labels:
         if label["instances"]:
+            class_names.append(label["readable"])
             class_colors.append(label["color"])
     
-    return class_colors
-
-
-# def get_class_id(root_dir, version='v2.0'):
-#     """
-#     Get mapping from original label_id to class_id (thing classes only)
-#     Returns dict where key is original label_id, value is class_id (1-indexed)
-#     """
-#     config_path = os.path.join(root_dir, f'config_{version}.json')
-#     with open(config_path, 'r') as f:
-#         config = json.load(f)
-    
-#     labels = config['labels']
-    
-
-    
-#     class_counter = 1  # Start from 1 (0 is background)
-#     for class_id, label in enumerate(labels):
-#         if label["instances"]:
-#             label_id_to_class_id[class_counter] = class_counter
-#             class_counter += 1
-    
-#     return label_id_to_class_id
-
+    return class_names, class_colors
 
 # Get class names
-class_names = get_class_names(DATASET_ROOT, VERSION)
+class_names, class_colors = get_class_names(DATASET_ROOT, VERSION)
 print(f"\nClass names ({len(class_names)} total):")
-
-
-class_color = get_class_colors(DATASET_ROOT, VERSION)
-print(f"\nClass colors ({len(class_color)} total):")
-for i, color in enumerate(class_color):
+print(f"\nClass colors ({len(class_colors)} total):")
+for i, color in enumerate(class_colors):
     print(f"  {i}: {color}")
-# label_id_to_class_id
-# class_id_mapping = get_class_id(DATASET_ROOT, VERSION)
-# print(f"\nClass ID mapping (original label_id -> class_id):")
-# for label_id, class_id in class_id_mapping.items():
-#     print(f"  {label_id} -> {class_id}")
 
 limit_classes = None
 for i, name in enumerate(class_names[:limit_classes]):  # Print first 10
     print(f"  {i}: {name}")
-# if len(class_names) > 10:
-#     print(f"  ... and {len(class_names) - 10} more classes")
 
-for class_name_itm, class_color_itm, class_id_itm in zip(class_names, class_color, range(len(class_names))):
+for class_name_itm, class_color_itm, class_id_itm in zip(class_names, class_colors, range(len(class_names))):
     print(f"Class ID: {class_id_itm}, Name: {class_name_itm}, Color: {class_color_itm}")
 
 
@@ -513,43 +447,15 @@ def visualize_instance_segmentation(image, target, class_names=None):
 
 
 #%%
-
-# create rrun class id 
-# Log an annotation context to assign a label and color to each class
-
-
-#%%
-
-
-# def annotation_context_assingment(class_color, class_names):
-
-#     # Load config file to get label information
-
-#     for class_color, class_name, class_id in zip(class_color, class_names, range(len(class_names))):
-#         print(f"Class id: {class_id}, Class: {class_name}, Color: {class_color}")
-#         rr.log(
-#             "image/instance",
-#             rr.AnnotationContext(
-#                 [
-#                     rr.AnnotationInfo(id=class_id, label=class_name, color=tuple(class_color)),
-#                 ],
-#             ),
-#             static=True,
-#         )
-
-# annotation_context_assingment(class_color, class_names,)
-
-#%%
 from rich import print as rprint
 def visualize_instance_segmentation_rr(image, target, class_names=None):
     """
-    Visualize image with instance masks overlayed.
+    Visualize image with instance masks overlayed in Rerun.
     Args:
         image: Tensor, shape (C, H, W)
         target: Dict with 'masks', 'boxes', 'labels'
         class_names: Optional, list of class names (for legend)
     """
-
 
     # Convert tensor to numpy and scale to [0, 255]
     img_np = image.permute(1, 2, 0).cpu().numpy()
@@ -558,140 +464,58 @@ def visualize_instance_segmentation_rr(image, target, class_names=None):
     # Log image directly from tensor (rerun handles the display)
     rr.log("image", rr.Image(img_np, opacity=0.5))
 
-
-    # Prepare boxes and labels for rerun
-    n_instances = target["masks"].shape[0]
-    # rprint("Number of instances:", target["masks"].shape)
-    
-    # Convert image tensor to numpy (H, W, C)
-    img_np = image.permute(1, 2, 0).cpu().numpy()
-    img_np = np.clip(img_np, 0, 1)
-
-    plt.figure(figsize=(10, 8))
-    plt.imshow(img_np, origin='upper')
-    ax = plt.gca()
-    
     # Overlay each instance mask
     n_instances = target["masks"].shape[0]
 
-    if n_instances > 0:
-        # Extract box coordinates (XYXY format -> convert to [x, y, width, height])
-        boxes = target["boxes"].cpu().numpy()
-        box_array = []
-        labels_list = []
-        colors_list = []
+    for i in range(n_instances):
+        label = int(target["labels"][i])
+        
+        if class_names:
+            cls_name = class_names[label]
+        else:
+            cls_name = f"Class {label}"
 
-        for i in range(n_instances):
+        
+        # Normalize color from [0, 255] to [0, 1]
+        color = np.array(target["colors"][i]) / 255.0
+        
+        mask = target["masks"][i].cpu().numpy()
+        
+        # Mask is boolean, overlay semi-transparent
+        masked_img = np.zeros((*mask.shape, 4), dtype=np.float32)
+        masked_img[..., :3] = color
+        masked_img[..., 3] = 0.4 * mask  # Transparency
+        
+        # Draw bounding box
+        box = target["boxes"][i].cpu().numpy()
+        x1, y1, x2, y2 = box.astype(int)
+        
+        masked_img_PIL = Image.fromarray((masked_img * 255).astype(np.uint8))
+        temp_masked_img_path = f"temp_masked_img_{i}.png"
+        masked_img_PIL.save(temp_masked_img_path)
+        rr.log(
+            f"image/instances/{i}/masked_img",
+            rr.EncodedImage(path=temp_masked_img_path, opacity=0.7),
+            )
+        os.remove(temp_masked_img_path)
 
-            x1, y1, x2, y2 = boxes[i].astype(np.int32)
-            # rprint(f"Box {i}: ({x1}, {y1}), ({x2}, {y2})")
 
-            box_array.append([x1, y1, x2, y2])
-            label = int(target["labels"][i])
-            if class_names:
-                cls_name = class_names[label]
-            else:
-                cls_name = f"Class {label}"
-            labels_list.append(cls_name)
-            # Normalize color from [0, 255] to [0, 1]
-            color_uint8 = target["colors"][i]
-
-            color = np.array(target["colors"][i]) / 255.0
-            colors_list.append(color)
-            
-            mask = target["masks"][i].cpu().numpy()
-            label = int(target["labels"][i])
-            # Normalize color from [0, 255] to [0, 1]
-            color = np.array(target["colors"][i]) / 255.0
-            
-            # Mask is boolean, overlay semi-transparent
-            masked_img = np.zeros((*mask.shape, 4), dtype=np.float32)
-            masked_img[..., :3] = color
-            masked_img[..., 3] = 0.4 * mask  # Transparency
-            
-            ax.imshow(masked_img, interpolation="none")
-
-            # Draw bounding box
-            box = target["boxes"][i].cpu().numpy()
-            x1, y1, x2, y2 = box.astype(int)
-            rect = plt.Rectangle((x1, y1), x2-x1, y2-y1, fill=False, color=color, linewidth=0.5)
-            ax.add_patch(rect)
-            
-            # Put label
-            if class_names:
-                cls_name = class_names[label]
-            else:
-                cls_name = str(label)
-            ax.text(x1, y1, cls_name, color='white', fontsize=5, bbox=dict(facecolor=tuple(color), alpha=0.7))
-
-            # log the mask as image on top of the original image
-
-            # # convert the mask to PIL image
-            # from PIL import Image
-            # mask_pil = Image.fromarray((mask * 255).astype(np.uint8))
-            
-            # # save the mask_pil temporarily and log it
-            # temp_mask_path = f"temp_mask_{i}.png"
-            # mask_pil.save(temp_mask_path)
-
-            # rr.log(
-            #     f"image/instances/{i}/mask",
-            #     rr.EncodedImage(path=temp_mask_path, opacity=0.3),
-            #     static=True 
-            # )
-            # os.remove(temp_mask_path)
-
-            # also log the mask image 
-
-            masked_img_PIL = Image.fromarray((masked_img * 255).astype(np.uint8))
-            temp_masked_img_path = f"temp_masked_img_{i}.png"
-            masked_img_PIL.save(temp_masked_img_path)
-            rr.log(
-                f"image/instances/{i}/masked_img",
-                rr.EncodedImage(path=temp_masked_img_path, opacity=0.7),
+        print(label)
+        # log the boxes one by one to be able to see them in rerun
+        rr.log(
+                f"image/instances/{i}/boxes2d",
+                rr.Boxes2D(
+                    array=np.array([x1, y1, x2, y2]),
+                    array_format=rr.Box2DFormat.XYXY,
+                    labels=[cls_name],
+                    colors=[tuple(color)], # Convert back to 0-255
+                    class_ids=[label],
+                    show_labels=True,
                 )
-            os.remove(temp_masked_img_path)
+            )
 
-
-            print(label)
-            # log the boxes one by one to be able to see them in rerun
-            rr.log(
-                    f"image/instances/{i}/boxes2d",
-                    rr.Boxes2D(
-                        array=np.array([x1, y1, x2, y2]),
-                        array_format=rr.Box2DFormat.XYXY,
-                        labels=[cls_name],
-                        colors=[tuple(color_uint8)], # Convert back to 0-255
-                        class_ids=[label],
-                        show_labels=True,
-                    )
-                )
-
-
-
-    # rr.log(
-    #     "mapillary/boxes2d",
-    #     rr.Boxes2D(
-    #         array=np.array(box_array),
-    #         array_format=rr.Box2DFormat.XYXY,
-    #         labels=labels_list,
-    #         colors=[tuple((c* 255).astype(int)) for c in colors_list], # Convert back to 0-255
-    #         show_labels=True,
-    #     )
-    # )
-
-    plt.axis('off')
-    plt.show()
 
 
 visualize_instance_segmentation_rr(images[1], targets[1], class_names)
-
-# %%
-
-images[1]
-# %%
-targets[1]
-# %%
-
 
 # %%
